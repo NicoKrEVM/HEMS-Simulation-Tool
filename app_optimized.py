@@ -4,21 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 
-# 📷 Firmenlogo laden
-logo_path = "Logo_Energieversorgung_Mittelrhein_(evm).svg.png"
-
-# 📐 Logo kleiner und oben rechts platzieren
-try:
-    st.markdown(
-        f"""
-        <div style="text-align: right;">
-            <img src="{logo_path}" width="150">
-        </div>
-        """, unsafe_allow_html=True
-    )
-except FileNotFoundError:
-    st.warning("⚠️ Firmenlogo konnte nicht geladen werden. Bitte stelle sicher, dass die Datei im Verzeichnis liegt.")
-
+# 📷 Firmenlogo einfügen
+logo = Image.open("Logo_Energieversorgung_Mittelrhein_(evm).svg.png")
+st.image(logo, use_column_width=True)
 
 # 📂 Excel-Datei laden
 @st.cache_data
