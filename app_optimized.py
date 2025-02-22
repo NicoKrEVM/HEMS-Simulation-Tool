@@ -136,28 +136,48 @@ df_filtered = df[(df["Datum"] >= pd.to_datetime(start_date)) & (df["Datum"] < pd
 # 📅 Erstelle fortlaufenden Zeitstempel (Datum + Stunde)
 df_filtered["Zeit"] = pd.to_datetime(df_filtered["Datum"]) + pd.to_timedelta(df_filtered["Stunde"], unit='h')
 
-# 📊 Visualisierung: PV, SOC, Verbrauch (mit fortlaufender Zeitachse)
+# 📊 Visualisierung: PV, SOC/Preis, Verbrauch (mit erweiterter Auswahl)
 fig, ax1 = plt.subplots(figsize=(15, 6))
 
 if df_filtered.empty:
     st.warning("⚠️ Keine Daten für den ausgewählten Zeitraum.")
 else:
-    # ✅ PV und SOC als Linien mit fortlaufendem Zeitstempel
-    ax1.plot(df_filtered["Zeit"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-    ax1.plot(df_filtered["Zeit"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
+    # 📊 Auswahl: SOC (%) oder Strompreis anzeigen
+    plot_option = st.selectbox("🔄 Wähle Anzeige auf rechter Achse:", ["Batterie-SOC (%)", "Strompreis (Ct/kWh)"])
 
-    # 📊 Haushaltsverbrauch & WP-Verbrauch als Balken
+    # ✅ PV und Verbrauch auf linker Achse
+    ax1.plot(df_filtered["Zeit"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
     bar_width = 0.03  # Schmaler Balken für Zeitreihe
     x = df_filtered["Zeit"]
     ax1.bar(x - pd.Timedelta(minutes=15), df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
     ax1.bar(x + pd.Timedelta(minutes=15), df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
-    # 🏷️ Achsen und Legende
+    # Achsentitel & Skalierung linke Achse
     ax1.set_xlabel("Zeit")
     ax1.set_ylabel("kWh")
-    ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (Fortlaufender Verlauf)")
-    ax1.legend()
+    ax1.set_title("PV-Erzeugung, Verbrauch & SOC/Strompreis (7-Tages-Ansicht)")
+    ax1.legend(loc='upper left')
     ax1.grid(True)
+
+    # ➡️ Rechte Achse hinzufügen
+    ax2 = ax1.twinx()
+
+    if plot_option == "Batterie-SOC (%)":
+        # SOC in % berechnen und darstellen
+        df_filtered["SOC_%"] = (df_filtered["SOC"] / batterie_kapazitaet) * 100
+        ax2.plot(df_filtered["Zeit"], df_filtered["SOC_%"], label="Batterie-SOC (%)", color="green", linestyle="--", linewidth=2)
+        ax2.set_ylabel("Batterie-SOC (%)", color="green")
+        ax2.tick_params(axis='y', labelcolor="green")
+    else:
+        # Strompreis darstellen
+        ax2.plot(df_filtered["Zeit"], df_filtered["Netzpreis"], label="Strompreis (Ct/kWh)", color="purple", linestyle="--", linewidth=2)
+        ax2.set_ylabel("Strompreis (Ct/kWh)", color="purple")
+        ax2.tick_params(axis='y', labelcolor="purple")
+
+    # Legende kombinieren
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc="upper right")
 
 # 📊 Plot anzeigen
 st.pyplot(fig)
