@@ -1,8 +1,7 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as pltpy
+import matplotlib.pyplot as plt
 
 # 📂 Excel-Datei laden
 @st.cache_data
@@ -130,22 +129,25 @@ df_filtered = df[(df["Datum"] >= pd.to_datetime(start_date)) & (df["Datum"] < pd
 # 📊 Visualisierung: PV, SOC, Verbrauch
 fig, ax1 = plt.subplots(figsize=(15, 6))
 
-# PV und SOC als Linien
-ax1.plot(df_filtered["Stunde"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-ax1.plot(df_filtered["Stunde"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
+if df_filtered.empty:
+    st.warning("⚠️ Keine Daten für den ausgewählten Zeitraum.")
+else:
+    # PV und SOC als Linien
+    ax1.plot(df_filtered["Stunde"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
+    ax1.plot(df_filtered["Stunde"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
 
-# Haushaltsverbrauch & WP-Verbrauch als Balken
-bar_width = 0.4
-x = np.arange(len(df_filtered["Stunde"]))
-ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
-ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
+    # Haushaltsverbrauch & WP-Verbrauch als Balken
+    bar_width = 0.4
+    x = np.arange(len(df_filtered["Stunde"]))
+    ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
+    ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
-# Achsen und Legende
-ax1.set_xlabel("Stunde")
-ax1.set_ylabel("kWh")
-ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (7-Tages-Ansicht)")
-ax1.legend()
-ax1.grid(True)
+    # Achsen und Legende
+    ax1.set_xlabel("Stunde")
+    ax1.set_ylabel("kWh")
+    ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (7-Tages-Ansicht)")
+    ax1.legend()
+    ax1.grid(True)
 
 st.pyplot(fig)
 
