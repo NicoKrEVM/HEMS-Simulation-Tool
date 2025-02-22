@@ -168,6 +168,7 @@ else:
         ax2.plot(df_filtered["Zeit"], df_filtered["SOC_%"], label="Batterie-SOC (%)", color="green", linestyle="--", linewidth=2)
         ax2.set_ylabel("Batterie-SOC (%)", color="green")
         ax2.tick_params(axis='y', labelcolor="green")
+        ax2.set_ylim(0, 100)
     else:
         # Strompreis darstellen
         ax2.plot(df_filtered["Zeit"], df_filtered["Netzpreis"], label="Strompreis (Ct/kWh)", color="purple", linestyle="--", linewidth=2)
