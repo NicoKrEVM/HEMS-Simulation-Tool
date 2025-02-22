@@ -133,29 +133,33 @@ end_date = start_date + pd.Timedelta(days=7)
 
 df_filtered = df[(df["Datum"] >= pd.to_datetime(start_date)) & (df["Datum"] < pd.to_datetime(end_date))]
 
-# 📊 Visualisierung: PV, SOC, Verbrauch
+# 📅 Erstelle fortlaufenden Zeitstempel (Datum + Stunde)
+df_filtered["Zeit"] = pd.to_datetime(df_filtered["Datum"]) + pd.to_timedelta(df_filtered["Stunde"], unit='h')
+
+# 📊 Visualisierung: PV, SOC, Verbrauch (mit fortlaufender Zeitachse)
 fig, ax1 = plt.subplots(figsize=(15, 6))
 
 if df_filtered.empty:
     st.warning("⚠️ Keine Daten für den ausgewählten Zeitraum.")
 else:
-    # PV und SOC als Linien (Index verwendet)
-    ax1.plot(df_filtered.index, df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-    ax1.plot(df_filtered.index, df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
+    # ✅ PV und SOC als Linien mit fortlaufendem Zeitstempel
+    ax1.plot(df_filtered["Zeit"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
+    ax1.plot(df_filtered["Zeit"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
 
-    # Haushaltsverbrauch & WP-Verbrauch als Balken
-    bar_width = 0.4
-    x = df_filtered.index
-    ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
-    ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
+    # 📊 Haushaltsverbrauch & WP-Verbrauch als Balken
+    bar_width = 0.03  # Schmaler Balken für Zeitreihe
+    x = df_filtered["Zeit"]
+    ax1.bar(x - pd.Timedelta(minutes=15), df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
+    ax1.bar(x + pd.Timedelta(minutes=15), df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
-    # Achsen und Legende
-    ax1.set_xlabel("Index-Stunde")
+    # 🏷️ Achsen und Legende
+    ax1.set_xlabel("Zeit")
     ax1.set_ylabel("kWh")
     ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (Fortlaufender Verlauf)")
     ax1.legend()
     ax1.grid(True)
 
+# 📊 Plot anzeigen
 st.pyplot(fig)
 
 # 📥 CSV-Download
