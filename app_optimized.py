@@ -191,3 +191,11 @@ st.download_button(
     file_name='simulationsergebnisse.csv',
     mime='text/csv',
 )
+# 📬 Kontaktinformationen als Footer
+st.markdown("---")  # Trennt den Footer vom Rest der App
+st.markdown("""
+### 📧 Kontaktinformationen  
+Bei Rückfragen zum Tool sowie dem Projekt **"Smartes Energiesystem"** wenden Sie sich gerne an das Team des Innovationsmanagements.  
+**Ihr Ansprechpartner:** Nicolai Kretz  
+📩 **E-Mail:** nicolai.kretz@evm.de  
+""")
