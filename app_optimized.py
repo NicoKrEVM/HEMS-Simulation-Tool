@@ -75,29 +75,36 @@ if wp_optimierung:
             df.at[i, "WP_Optimiert"] -= aktuelle_last
             df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
 
-# ⚡ Batteriespeicher: Laden & Entladen
+# ⚡ Batteriespeicher: Laden & Entladen (fortlaufend über den Monat)
 df["SOC"] = 0  # State of Charge
 df["Batterie_Ladung"] = 0
 df["Batterie_Entladung"] = 0
 
-soc = 0
-for i in range(len(df)):
+soc = 0  # Initialer SOC
+
+for i in df.index:
+    # 💡 Berechne PV-Überschuss pro Stunde
     pv_ueberschuss = max(df.loc[i, "PV-Erzeugung"] - (df.loc[i, "Haushaltsverbrauch"] + df.loc[i, "WP_Optimiert"]), 0)
+
+    # 🔋 Lade die Batterie mit PV-Überschuss (96% Wirkungsgrad)
     ladung = min(batterie_kapazitaet - soc, pv_ueberschuss)
     soc += ladung * 0.96  # 96% Wirkungsgrad
     soc = min(batterie_kapazitaet, max(0, soc))  # Begrenzung des SOC
     df.at[i, "Batterie_Ladung"] = ladung
 
-    # Falls Netzladung erlaubt ist und PV nicht ausreicht
-    if netzladung_erlaubt and ladung < (batterie_kapazitaet - soc):
-        netzladung = min(batterie_kapazitaet - soc, df.loc[i, "Netzpreis"])
+    # ⚡ Netzladung falls erlaubt
+    if netzladung_erlaubt and soc < batterie_kapazitaet:
+        netzladung = min(batterie_kapazitaet - soc, max(df.loc[i, "Netzpreis"], 0))
         soc += netzladung * 0.96
         df.at[i, "Batterie_Ladung"] += netzladung
 
+    # ⚡ Entlade die Batterie bei Bedarf
     strombedarf = max((df.loc[i, "Haushaltsverbrauch"] + df.loc[i, "WP_Optimiert"]) - df.loc[i, "PV-Erzeugung"], 0)
     entladung = min(soc, strombedarf)
-    soc -= entladung / 0.96  # Entladung berücksichtigt Wirkungsgrad
+    soc -= entladung / 0.96  # Entladung mit Wirkungsgradverlust
     df.at[i, "Batterie_Entladung"] = entladung
+
+    # ✅ Aktualisiere SOC
     df.at[i, "SOC"] = soc
 
 # 💰 Kosten & Erträge berechnen
@@ -132,20 +139,20 @@ fig, ax1 = plt.subplots(figsize=(15, 6))
 if df_filtered.empty:
     st.warning("⚠️ Keine Daten für den ausgewählten Zeitraum.")
 else:
-    # PV und SOC als Linien
-    ax1.plot(df_filtered["Stunde"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-    ax1.plot(df_filtered["Stunde"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
+    # PV und SOC als Linien (Index verwendet)
+    ax1.plot(df_filtered.index, df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
+    ax1.plot(df_filtered.index, df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
 
     # Haushaltsverbrauch & WP-Verbrauch als Balken
     bar_width = 0.4
-    x = np.arange(len(df_filtered["Stunde"]))
+    x = df_filtered.index
     ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
     ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
     # Achsen und Legende
-    ax1.set_xlabel("Stunde")
+    ax1.set_xlabel("Index-Stunde")
     ax1.set_ylabel("kWh")
-    ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (7-Tages-Ansicht)")
+    ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC (Fortlaufender Verlauf)")
     ax1.legend()
     ax1.grid(True)
 
