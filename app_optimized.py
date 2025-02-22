@@ -61,7 +61,7 @@ if "Dynamischer" in tarifwahl:
 else:
     df["Netzpreis"] = 33.9 if "Statischer" in tarifwahl else np.where(df["Wärmepumpen-Verbrauch"] > 0, 24.5, 33.9)
 
-# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h)
+# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Fehlerbehebung
 df["WP_Optimiert"] = df["Wärmepumpen-Verbrauch"]
 if wp_optimierung:
     for i in range(len(df)):
@@ -69,11 +69,18 @@ if wp_optimierung:
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
         start = max(0, i - 3)
         end = min(len(df) - 1, i + 3)
-        fenster = df.loc[start:end, "Netzpreis"]
-        guenstigste_stunde = fenster.idxmin()
-        if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
-            df.at[i, "WP_Optimiert"] -= aktuelle_last
-            df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
+        fenster = df.loc[start:end, ["Netzpreis"]]
+
+        # 🟢 Fehlerbehebung: idxmin() korrekt anwenden
+        guenstigste_stunde = fenster["Netzpreis"].idxmin()
+
+        # Prüfen, ob der Index existiert
+        if guenstigste_stunde in df.index:
+            if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
+                df.at[i, "WP_Optimiert"] -= aktuelle_last
+                df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
+        else:
+            st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
 
 # ⚡ Batteriespeicher: Laden & Entladen (fortlaufend über den Monat)
 df["SOC"] = 0  # State of Charge
