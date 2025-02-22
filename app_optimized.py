@@ -68,19 +68,22 @@ if wp_optimierung:
         aktueller_preis = df.loc[i, "Netzpreis"]
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
         start = max(0, i - 3)
-        end = min(len(df) - 1, i + 3)
+        end = min(df.index.max(), i + 3)  # Verwende df.index.max() statt len(df) - 1
         fenster = df.loc[start:end, ["Netzpreis"]]
 
-        # 🟢 Fehlerbehebung: idxmin() korrekt anwenden
-        guenstigste_stunde = fenster["Netzpreis"].idxmin()
+        # Prüfen, ob das Fenster leer ist
+        if not fenster.empty:
+            guenstigste_stunde = fenster["Netzpreis"].idxmin()
 
-        # Prüfen, ob der Index existiert
-        if guenstigste_stunde in df.index:
-            if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
-                df.at[i, "WP_Optimiert"] -= aktuelle_last
-                df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
+            # Prüfen, ob der Index existiert
+            if guenstigste_stunde in df.index:
+                if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
+                    df.at[i, "WP_Optimiert"] -= aktuelle_last
+                    df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
+            else:
+                st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
         else:
-            st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
+            st.warning(f"⚠️ Leeres Optimierungsfenster bei Stunde {i}.")
 
 # ⚡ Batteriespeicher: Laden & Entladen (fortlaufend über den Monat)
 df["SOC"] = 0  # State of Charge
