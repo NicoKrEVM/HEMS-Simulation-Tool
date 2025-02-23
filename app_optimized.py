@@ -61,18 +61,23 @@ if "Dynamischer" in tarifwahl:
 else:
     df["Netzpreis"] = 33.9 if "Statischer" in tarifwahl else np.where(df["Wärmepumpen-Verbrauch"] > 0, 24.5, 33.9)
 
-# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Fehlerbehandlung
+# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Indexkontrolle
 df.reset_index(drop=True, inplace=True)  # Index zurücksetzen
 df["WP_Optimiert"] = df["Wärmepumpen-Verbrauch"]
 
 if wp_optimierung:
+    max_index = 722 if monat == "Juni" else len(df) - 1  # Setze max. Index für Juni
+
     for i in range(len(df)):
+        if i > max_index:
+            break  # Überspringe Indizes außerhalb des Monats
+
         aktueller_preis = df.loc[i, "Netzpreis"]
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
-        
+
         # 🟡 Fenstergröße anpassen (±3h), dabei DataFrame-Grenzen berücksichtigen
         start = max(0, i - 3)
-        end = min(len(df) - 1, i + 3)
+        end = min(max_index, i + 3)
 
         # 💡 Prüfe Optimierungsfenster
         fenster = df.loc[start:end, ["Netzpreis"]]
