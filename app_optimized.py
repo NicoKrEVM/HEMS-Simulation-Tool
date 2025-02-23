@@ -61,34 +61,36 @@ if "Dynamischer" in tarifwahl:
 else:
     df["Netzpreis"] = 33.9 if "Statischer" in tarifwahl else np.where(df["Wärmepumpen-Verbrauch"] > 0, 24.5, 33.9)
 
-# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Fehlerbehebung
+# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Fehlerbehandlung
+df.reset_index(drop=True, inplace=True)  # Index zurücksetzen
 df["WP_Optimiert"] = df["Wärmepumpen-Verbrauch"]
+
 if wp_optimierung:
     for i in range(len(df)):
         aktueller_preis = df.loc[i, "Netzpreis"]
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
+        
+        # 🟡 Fenstergröße anpassen (±3h), dabei DataFrame-Grenzen berücksichtigen
         start = max(0, i - 3)
-        end = min(df.index.max(), i + 3)  # Begrenzung auf Indexbereich
+        end = min(len(df) - 1, i + 3)
 
-        # Prüfen, ob der Endindex innerhalb der DataFrame-Grenzen liegt
-        if end >= len(df):
-            end = df.index.max()
-
+        # 💡 Prüfe Optimierungsfenster
         fenster = df.loc[start:end, ["Netzpreis"]]
 
-        # Prüfen, ob das Fenster leer ist
-        if not fenster.empty:
-            guenstigste_stunde = fenster["Netzpreis"].idxmin()
+        if fenster.empty:
+            st.warning(f"⚠️ Leeres Optimierungsfenster bei Stunde {i}.")
+            continue  # Gehe zur nächsten Stunde
 
-            # Prüfen, ob der Index gültig ist
-            if guenstigste_stunde in df.index:
-                if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
-                    df.at[i, "WP_Optimiert"] -= aktuelle_last
-                    df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
-            else:
-                st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
+        # 🔎 Finde die günstigste Stunde im Zeitfenster
+        guenstigste_stunde = fenster["Netzpreis"].idxmin()
+
+        # ✅ Nur wenn Index gültig ist
+        if guenstigste_stunde in df.index:
+            if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
+                df.at[i, "WP_Optimiert"] -= aktuelle_last
+                df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
         else:
-            pass  # Keine Warnung bei leerem Fenster am Monatsende
+            st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
 
 # ⚡ Batteriespeicher: Laden & Entladen (fortlaufend über den Monat)
 df["SOC"] = 0  # State of Charge
