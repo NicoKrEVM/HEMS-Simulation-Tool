@@ -43,9 +43,23 @@ if "Dynamischer" in tarifwahl:
 else:
     margen_aufschlag = 0
 
-# 💰 Einspeisevergütung mit Jahr
-einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", ["8,11 (Stand 2024)", "7,95 (Stand 2025)"])
-einspeiseverguetung_value = 8.11 if "2024" in einspeiseverguetung else 7.95
+# 💰 Einspeisevergütung mit Jahr und neuer Option
+einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", [
+    "8,11 (Stand 2024)", 
+    "7,95 (Stand 2025)", 
+    "0,00 (Abhängig von Regulatorik der neuen BReg)"
+])
+
+# Auswahl in den Wert umwandeln
+if "8,11" in einspeiseverguetung:
+    einspeiseverguetung_value = 8.11
+elif "7,95" in einspeiseverguetung:
+    einspeiseverguetung_value = 7.95
+else:
+    einspeiseverguetung_value = 0.0  # Keine Einspeisevergütung
+
+# 💰 Einspeiseerlös berechnen
+df["Einspeiseerlös"] = df["Einspeisung"] * (einspeiseverguetung_value / 100)
 
 # ✅ Checkboxen zur Steuerung der Optimierung
 wp_optimierung = st.checkbox("🔀 Wärmepumpen-Optimierung aktivieren", value=True)
