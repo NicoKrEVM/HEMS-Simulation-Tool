@@ -58,9 +58,6 @@ elif "7,95" in einspeiseverguetung:
 else:
     einspeiseverguetung_value = 0.0  # Keine Einspeisevergütung
 
-# 💰 Einspeiseerlös berechnen
-df["Einspeiseerlös"] = df["Einspeisung"] * (einspeiseverguetung_value / 100)
-
 # ✅ Checkboxen zur Steuerung der Optimierung
 wp_optimierung = st.checkbox("🔀 Wärmepumpen-Optimierung aktivieren", value=True)
 netzladung_erlaubt = st.checkbox("🔋 Netzladung der Batterie erlauben", value=False)
