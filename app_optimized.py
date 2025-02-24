@@ -155,19 +155,38 @@ elif zeitraum == "Woche":
 else:
     df_filtered = df
 
-# 📊 Visualisierung: PV, SOC, Verbrauch
+# 🎯 Auswahl für rechte Y-Achse: SOC oder Strompreis
+right_axis_option = st.radio("📊 Rechte Achse anzeigen als:", ["SOC der Batterie", "Strompreis"])
+
+# 📊 Visualisierung: PV, SOC, Verbrauch, Preise
 fig, ax1 = plt.subplots(figsize=(15, 6))
+
+# Linke Achse: PV-Erzeugung und Verbräuche
 ax1.plot(df_filtered["Index"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-ax1.plot(df_filtered["Index"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
 bar_width = 0.4
 x = df_filtered["Index"]
 ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
 ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
+# Rechte Achse: SOC oder Strompreis
+ax2 = ax1.twinx()
+if right_axis_option == "SOC der Batterie":
+    ax2.plot(df_filtered["Index"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
+    ax2.set_ylabel("SOC (kWh)")
+else:
+    if "Kombinierter WP-Tarif" in tarifwahl:
+        ax2.axhline(y=33.9, color="purple", linestyle="--", label="33,9 Ct/kWh (Haushalt)")
+        ax2.axhline(y=24.5, color="brown", linestyle="--", label="24,5 Ct/kWh (WP)")
+    else:
+        ax2.plot(df_filtered["Index"], df_filtered["Netzpreis"], label="Strompreis", color="black", linestyle="--")
+    ax2.set_ylabel("Strompreis (Ct/kWh)")
+
+# Titel und Legenden
 ax1.set_xlabel("Index-Stunde")
-ax1.set_ylabel("kWh")
+ax1.set_ylabel("Verbrauch (kWh)")
 ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC")
-ax1.legend()
+ax1.legend(loc="upper left")
+ax2.legend(loc="upper right")
 ax1.grid(True)
 st.pyplot(fig)
 
