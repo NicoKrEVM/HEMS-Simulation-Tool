@@ -1,3 +1,6 @@
+# Den aktualisierten App-Code erstellen und als app_optimized.py speichern
+
+updated_app_code = """
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,14 +14,15 @@ def load_data(sheet_name):
     return df
 
 # Titel der App
-st.title("🔋 PV & Batteriespeicher Simulation mit Monatswahl und Optimierung")
+st.title("🔋 PV & Batteriespeicher Simulation mit Jahres- und Zeitraumauswahl")
 st.write("Wähle den Monat, optimiere den Wärmepumpenverbrauch und steuere die Netzladung der Batterie.")
 
-# 📆 Monat auswählen
-monat = st.selectbox("📆 Wähle den Monat aus:", ["Juni", "Dezember"])
+# 📆 Monat auswählen (mit Jahr)
+monat = st.selectbox("📆 Wähle den Monat aus:", ["Juni 2024", "Dezember 2024"])
 
-# Daten laden
-df = load_data(monat)
+# Mapping für den Excel-Sheetnamen
+sheet_mapping = {"Juni 2024": "Juni", "Dezember 2024": "Dezember"}
+df = load_data(sheet_mapping[monat])
 
 # 📈 PV-Anlagengröße auswählen
 pv_leistung = st.slider("📈 PV-Leistung (kWp)", min_value=5.0, max_value=20.0, value=11.0, step=0.5)
@@ -39,8 +43,9 @@ tarifwahl = st.selectbox("⚡ Wähle den Stromtarif:", [
 # 🧮 Margenaufschlag für dynamische Tarife
 margen_aufschlag = st.slider("📊 Margenaufschlag auf Spotpreis (Ct/kWh)", min_value=5.0, max_value=20.0, value=10.0, step=0.5)
 
-# 💰 Einspeisevergütung
-einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", [8.11, 7.95])
+# 💰 Einspeisevergütung mit Jahr
+einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", ["8,11 (Stand 2024)", "7,95 (Stand 2025)"])
+einspeiseverguetung_value = 8.11 if "2024" in einspeiseverguetung else 7.95
 
 # 🔀 Zusätzliche Optimierungsoptionen
 if "Dynamischer" in tarifwahl:
@@ -61,78 +66,49 @@ if "Dynamischer" in tarifwahl:
 else:
     df["Netzpreis"] = 33.9 if "Statischer" in tarifwahl else np.where(df["Wärmepumpen-Verbrauch"] > 0, 24.5, 33.9)
 
-# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h) mit Indexkontrolle
-df.reset_index(drop=True, inplace=True)  # Index zurücksetzen
+# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h)
 df["WP_Optimiert"] = df["Wärmepumpen-Verbrauch"]
-
 if wp_optimierung:
-    max_index = 722 if monat == "Juni" else len(df) - 1  # Setze max. Index für Juni
-
     for i in range(len(df)):
-        if i > max_index:
-            break  # Überspringe Indizes außerhalb des Monats
-
         aktueller_preis = df.loc[i, "Netzpreis"]
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
-
-        # 🟡 Fenstergröße anpassen (±3h), dabei DataFrame-Grenzen berücksichtigen
         start = max(0, i - 3)
-        end = min(max_index, i + 3)
+        end = min(len(df) - 1, i + 3)
+        fenster = df.loc[start:end, "Netzpreis"]
+        guenstigste_stunde = fenster.idxmin()
+        if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
+            df.at[i, "WP_Optimiert"] -= aktuelle_last
+            df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
 
-        # 💡 Prüfe Optimierungsfenster
-        fenster = df.loc[start:end, ["Netzpreis"]]
-
-        if fenster.empty:
-            st.warning(f"⚠️ Leeres Optimierungsfenster bei Stunde {i}.")
-            continue  # Gehe zur nächsten Stunde
-
-        # 🔎 Finde die günstigste Stunde im Zeitfenster
-        guenstigste_stunde = fenster["Netzpreis"].idxmin()
-
-        # ✅ Nur wenn Index gültig ist
-        if guenstigste_stunde in df.index:
-            if df.loc[guenstigste_stunde, "Netzpreis"] < aktueller_preis:
-                df.at[i, "WP_Optimiert"] -= aktuelle_last
-                df.at[guenstigste_stunde, "WP_Optimiert"] += aktuelle_last
-        else:
-            st.warning(f"⚠️ Kein gültiger Index gefunden für die Lastverschiebung bei Stunde {i}.")
-
-# ⚡ Batteriespeicher: Laden & Entladen (fortlaufend über den Monat)
+# ⚡ Batteriespeicher: Laden & Entladen
 df["SOC"] = 0  # State of Charge
 df["Batterie_Ladung"] = 0
 df["Batterie_Entladung"] = 0
 
-soc = 0  # Initialer SOC
-
-for i in df.index:
-    # 💡 Berechne PV-Überschuss pro Stunde
+soc = 0
+for i in range(len(df)):
     pv_ueberschuss = max(df.loc[i, "PV-Erzeugung"] - (df.loc[i, "Haushaltsverbrauch"] + df.loc[i, "WP_Optimiert"]), 0)
-
-    # 🔋 Lade die Batterie mit PV-Überschuss (96% Wirkungsgrad)
     ladung = min(batterie_kapazitaet - soc, pv_ueberschuss)
     soc += ladung * 0.96  # 96% Wirkungsgrad
     soc = min(batterie_kapazitaet, max(0, soc))  # Begrenzung des SOC
     df.at[i, "Batterie_Ladung"] = ladung
 
-    # ⚡ Netzladung falls erlaubt
-    if netzladung_erlaubt and soc < batterie_kapazitaet:
-        netzladung = min(batterie_kapazitaet - soc, max(df.loc[i, "Netzpreis"], 0))
+    # Falls Netzladung erlaubt ist und PV nicht ausreicht
+    if netzladung_erlaubt and ladung < (batterie_kapazitaet - soc):
+        netzladung = min(batterie_kapazitaet - soc, df.loc[i, "Netzpreis"])
         soc += netzladung * 0.96
         df.at[i, "Batterie_Ladung"] += netzladung
 
-    # ⚡ Entlade die Batterie bei Bedarf
     strombedarf = max((df.loc[i, "Haushaltsverbrauch"] + df.loc[i, "WP_Optimiert"]) - df.loc[i, "PV-Erzeugung"], 0)
     entladung = min(soc, strombedarf)
-    soc -= entladung / 0.96  # Entladung mit Wirkungsgradverlust
+    soc -= entladung / 0.96  # Entladung berücksichtigt Wirkungsgrad
     df.at[i, "Batterie_Entladung"] = entladung
-
-    # ✅ Aktualisiere SOC
     df.at[i, "SOC"] = soc
 
 # 💰 Kosten & Erträge berechnen
 df["Netzbezug"] = np.maximum(df["Haushaltsverbrauch"] + df["WP_Optimiert"] - df["PV-Erzeugung"] - df["Batterie_Entladung"], 0)
 df["Einspeisung"] = np.maximum(df["PV-Erzeugung"] - (df["Haushaltsverbrauch"] + df["WP_Optimiert"] - df["Batterie_Entladung"]), 0)
-df["Einspeiseerlös"] = df["Einspeisung"] * (einspeiseverguetung / 100)
+df["Einspeiseerlös"] = df["Einspeisung"] * (einspeiseverguetung_value / 100)
 df["Netzkosten"] = df["Netzbezug"] * (df["Netzpreis"] / 100)
 
 # 💸 Gesamtkosten
@@ -146,63 +122,40 @@ st.write(f"**Gesamtkosten für Netzstrom:** {total_cost:.2f} €")
 st.write(f"**Einnahmen aus Einspeisung:** {total_income:.2f} €")
 st.write(f"**Endsaldo (Netzkosten - Einspeiseerlöse):** {total_balance:.2f} €")
 
-# 📅 7-Tage-Slider für Visualisierung
-min_day = df["Datum"].min().date()
-max_day = df["Datum"].max().date()
+# 📅 Visualisierungszeitraum auswählen (Tag, Woche, Monat)
+zeitraum = st.radio("📊 Wähle den Zeitraum für die Visualisierung:", ["Tag", "Woche", "Monat"])
 
-start_date = st.slider("📅 Wähle Startdatum für die 7 Tage", min_value=min_day, max_value=max_day, value=min_day)
-end_date = start_date + pd.Timedelta(days=7)
+if zeitraum == "Tag":
+    unique_days = df["Datum"].dt.date.unique()
+    selected_day = st.selectbox("📅 Wähle den Tag aus:", unique_days)
+    df_filtered = df[df["Datum"].dt.date == selected_day]
+elif zeitraum == "Woche":
+    unique_weeks = df["Datum"].dt.isocalendar().week.unique()
+    selected_week = st.selectbox("📅 Wähle die Woche aus:", unique_weeks)
+    df_filtered = df[df["Datum"].dt.isocalendar().week == selected_week]
+else:
+    df_filtered = df  # Ganze Monat anzeigen
 
-df_filtered = df[(df["Datum"] >= pd.to_datetime(start_date)) & (df["Datum"] < pd.to_datetime(end_date))]
-
-# 📅 Erstelle fortlaufenden Zeitstempel (Datum + Stunde)
-df_filtered["Zeit"] = pd.to_datetime(df_filtered["Datum"]) + pd.to_timedelta(df_filtered["Stunde"], unit='h')
-
-# 📊 Visualisierung: PV, SOC/Preis, Verbrauch (mit erweiterter Auswahl)
+# 📊 Visualisierung: PV, SOC, Verbrauch
 fig, ax1 = plt.subplots(figsize=(15, 6))
 
-if df_filtered.empty:
-    st.warning("⚠️ Keine Daten für den ausgewählten Zeitraum.")
-else:
-    # 📊 Auswahl: SOC (%) oder Strompreis anzeigen
-    plot_option = st.selectbox("🔄 Wähle Anzeige auf rechter Achse:", ["Batterie-SOC (%)", "Strompreis (Ct/kWh)"])
+# PV und SOC als Linien
+ax1.plot(df_filtered["Stunde"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
+ax1.plot(df_filtered["Stunde"], df_filtered["SOC"], label="Batterie-SOC", color="green", linewidth=2)
 
-    # ✅ PV und Verbrauch auf linker Achse
-    ax1.plot(df_filtered["Zeit"], df_filtered["PV-Erzeugung"], label="PV-Erzeugung", color="orange", linewidth=2)
-    bar_width = 0.03  # Schmaler Balken für Zeitreihe
-    x = df_filtered["Zeit"]
-    ax1.bar(x - pd.Timedelta(minutes=15), df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
-    ax1.bar(x + pd.Timedelta(minutes=15), df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
+# Haushaltsverbrauch & WP-Verbrauch als Balken
+bar_width = 0.4
+x = np.arange(len(df_filtered["Stunde"]))
+ax1.bar(x - bar_width/2, df_filtered["Haushaltsverbrauch"], width=bar_width, label="Haushaltsverbrauch", color="blue", alpha=0.7)
+ax1.bar(x + bar_width/2, df_filtered["WP_Optimiert"], width=bar_width, label="WP-Verbrauch", color="red", alpha=0.7)
 
-    # Achsentitel & Skalierung linke Achse
-    ax1.set_xlabel("Zeit")
-    ax1.set_ylabel("kWh")
-    ax1.set_title("PV-Erzeugung, Verbrauch & SOC/Strompreis (7-Tages-Ansicht)")
-    ax1.legend(loc='upper left')
-    ax1.grid(True)
+# Achsen und Legende
+ax1.set_xlabel("Stunde")
+ax1.set_ylabel("kWh")
+ax1.set_title("PV-Erzeugung, Verbrauch & Batterie-SOC")
+ax1.legend()
+ax1.grid(True)
 
-    # ➡️ Rechte Achse hinzufügen
-    ax2 = ax1.twinx()
-
-    if plot_option == "Batterie-SOC (%)":
-        # SOC in % berechnen und darstellen
-        df_filtered["SOC_%"] = (df_filtered["SOC"] / batterie_kapazitaet) * 100
-        ax2.plot(df_filtered["Zeit"], df_filtered["SOC_%"], label="Batterie-SOC (%)", color="green", linestyle="--", linewidth=2)
-        ax2.set_ylabel("Batterie-SOC (%)", color="green")
-        ax2.tick_params(axis='y', labelcolor="green")
-        ax2.set_ylim(0, 100)
-    else:
-        # Strompreis darstellen
-        ax2.plot(df_filtered["Zeit"], df_filtered["Netzpreis"], label="Strompreis (Ct/kWh)", color="purple", linestyle="--", linewidth=2)
-        ax2.set_ylabel("Strompreis (Ct/kWh)", color="purple")
-        ax2.tick_params(axis='y', labelcolor="purple")
-
-    # Legende kombinieren
-    lines, labels = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines + lines2, labels + labels2, loc="upper right")
-
-# 📊 Plot anzeigen
 st.pyplot(fig)
 
 # 📥 CSV-Download
@@ -213,3 +166,11 @@ st.download_button(
     file_name='simulationsergebnisse.csv',
     mime='text/csv',
 )
+"""
+
+# 📁 Speichern der Datei als app_optimized.py
+file_path = "/kaggle/working/app_optimized.py"
+with open(file_path, "w") as file:
+    file.write(updated_app_code)
+
+file_path
