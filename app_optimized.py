@@ -11,7 +11,7 @@ def load_data(sheet_name):
     return df
 
 # Titel der App
-st.title("🔋 PV & Batteriespeicher Simulation mit Jahres- und Zeitraumauswahl")
+st.title("🔋 PV & Batteriespeicher Simulation mit Optimierung")
 st.write("Wähle den Monat, optimiere den Wärmepumpenverbrauch und steuere die Netzladung der Batterie.")
 
 # 📆 Monat auswählen (mit Jahr)
@@ -44,13 +44,9 @@ margen_aufschlag = st.slider("📊 Margenaufschlag auf Spotpreis (Ct/kWh)", min_
 einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", ["8,11 (Stand 2024)", "7,95 (Stand 2025)"])
 einspeiseverguetung_value = 8.11 if "2024" in einspeiseverguetung else 7.95
 
-# 🔀 Zusätzliche Optimierungsoptionen
-if "Dynamischer" in tarifwahl:
-    wp_optimierung = st.checkbox("🔀 Wärmepumpen-Optimierung aktivieren", value=True)
-    netzladung_erlaubt = st.checkbox("🔋 Netzladung der Batterie erlauben", value=False)
-else:
-    wp_optimierung = False
-    netzladung_erlaubt = False
+# ✅ Checkboxen zur Steuerung der Optimierung
+wp_optimierung = st.checkbox("🔀 Wärmepumpen-Optimierung aktivieren", value=True)
+netzladung_erlaubt = st.checkbox("🔋 Netzladung der Batterie erlauben", value=False)
 
 # 📊 Netzpreis berechnen
 if "Dynamischer" in tarifwahl:
