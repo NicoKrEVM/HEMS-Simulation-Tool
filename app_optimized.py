@@ -1,6 +1,4 @@
-# Den aktualisierten App-Code erstellen und als app_optimized.py speichern
 
-updated_app_code = """
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -166,11 +164,3 @@ st.download_button(
     file_name='simulationsergebnisse.csv',
     mime='text/csv',
 )
-"""
-
-# 📁 Speichern der Datei als app_optimized.py
-file_path = "/kaggle/working/app_optimized.py"
-with open(file_path, "w") as file:
-    file.write(updated_app_code)
-
-file_path
