@@ -38,7 +38,10 @@ tarifwahl = st.selectbox("⚡ Wähle den Stromtarif:", [
 ])
 
 # 🧮 Margenaufschlag für dynamische Tarife
-margen_aufschlag = st.slider("📊 Margenaufschlag auf Spotpreis (Ct/kWh)", min_value=5.0, max_value=20.0, value=10.0, step=0.5)
+if "Dynamischer" in tarifwahl:
+    margen_aufschlag = st.slider("📊 Margenaufschlag auf Spotpreis (Ct/kWh)", min_value=5.0, max_value=20.0, value=10.0, step=0.5)
+else:
+    margen_aufschlag = 0  # Kein Aufschlag bei statischen Tarifen
 
 # 💰 Einspeisevergütung mit Jahr
 einspeiseverguetung = st.radio("💰 Einspeisevergütung (Ct/kWh)", ["8,11 (Stand 2024)", "7,95 (Stand 2025)"])
@@ -59,9 +62,9 @@ if "Dynamischer" in tarifwahl:
 else:
     df["Netzpreis"] = 33.9 if "Statischer" in tarifwahl else np.where(df["Wärmepumpen-Verbrauch"] > 0, 24.5, 33.9)
 
-# 💡 Wärmepumpen-Optimierung (Lastverschiebung ±3h)
+# 💡 Wärmepumpen-Optimierung (nur wenn aktiviert)
 df["WP_Optimiert"] = df["Wärmepumpen-Verbrauch"]
-if wp_optimierung:
+if wp_optimierung and "Dynamischer" in tarifwahl:
     for i in range(len(df)):
         aktueller_preis = df.loc[i, "Netzpreis"]
         aktuelle_last = df.loc[i, "Wärmepumpen-Verbrauch"]
@@ -86,7 +89,7 @@ for i in range(len(df)):
     soc = min(batterie_kapazitaet, max(0, soc))  # Begrenzung des SOC
     df.at[i, "Batterie_Ladung"] = ladung
 
-    # Falls Netzladung erlaubt ist und PV nicht ausreicht
+    # Falls Netzladung erlaubt ist
     if netzladung_erlaubt and ladung < (batterie_kapazitaet - soc):
         netzladung = min(batterie_kapazitaet - soc, df.loc[i, "Netzpreis"])
         soc += netzladung * 0.96
@@ -118,14 +121,17 @@ st.write(f"**Endsaldo (Netzkosten - Einspeiseerlöse):** {total_balance:.2f} €
 # 📅 Visualisierungszeitraum auswählen (Tag, Woche, Monat)
 zeitraum = st.radio("📊 Wähle den Zeitraum für die Visualisierung:", ["Tag", "Woche", "Monat"])
 
+# Schieberegler (Slider) für Tag und Woche
 if zeitraum == "Tag":
     unique_days = df["Datum"].dt.date.unique()
-    selected_day = st.selectbox("📅 Wähle den Tag aus:", unique_days)
-    df_filtered = df[df["Datum"].dt.date == selected_day]
+    selected_day = st.slider("📅 Wähle den Tag aus:", min_value=0, max_value=len(unique_days)-1, value=0)
+    df_filtered = df[df["Datum"].dt.date == unique_days[selected_day]]
+
 elif zeitraum == "Woche":
     unique_weeks = df["Datum"].dt.isocalendar().week.unique()
-    selected_week = st.selectbox("📅 Wähle die Woche aus:", unique_weeks)
+    selected_week = st.slider("📅 Wähle die Woche aus:", min_value=min(unique_weeks), max_value=max(unique_weeks), value=min(unique_weeks))
     df_filtered = df[df["Datum"].dt.isocalendar().week == selected_week]
+
 else:
     df_filtered = df  # Ganze Monat anzeigen
 
